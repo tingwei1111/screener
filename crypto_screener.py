@@ -91,57 +91,73 @@ def calculate_rs_score(crypto_data, required_bars):
 
 def process_crypto(symbol, timeframe, days):
     """Process a single cryptocurrency and calculate its RS score"""
-    try:
-        cd = CryptoDownloader()
-        
-        # Calculate required bars
-        required_bars = calc_total_bars(timeframe, days)
-        
-        # Calculate start timestamp with some buffer (20% more time to ensure we get enough data)
-        buffer_factor = 1.2
-        now = int(time.time())
-        
-        # Estimate interval seconds based on timeframe
-        if "m" in timeframe:
-            minutes = int(timeframe.replace("m", ""))
-            interval_seconds = minutes * 60
-        elif "h" in timeframe:
-            hours = int(timeframe.replace("h", ""))
-            interval_seconds = hours * 3600
-        elif "d" in timeframe:
-            days = int(timeframe.replace("d", ""))
-            interval_seconds = days * 24 * 3600
-        else:
-            # Default to 1h if unknown format
-            interval_seconds = 3600
-        
-        start_ts = now - int(required_bars * interval_seconds * buffer_factor)
-        
-        # Get crypto data
-        success, data = cd.get_data(symbol, start_ts=start_ts, end_ts=now, timeframe=timeframe, atr=True)
-        
-        if not success or data.empty:
-            error_msg = "Failed to get data or empty dataset"
-            print(f"{symbol} -> Error: {error_msg}")
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            cd = CryptoDownloader()
+            
+            # Calculate required bars
+            required_bars = calc_total_bars(timeframe, days)
+            
+            # Calculate start timestamp with some buffer (20% more time to ensure we get enough data)
+            buffer_factor = 1.2
+            now = int(time.time())
+            
+            # Estimate interval seconds based on timeframe
+            if "m" in timeframe:
+                minutes = int(timeframe.replace("m", ""))
+                interval_seconds = minutes * 60
+            elif "h" in timeframe:
+                hours = int(timeframe.replace("h", ""))
+                interval_seconds = hours * 3600
+            elif "d" in timeframe:
+                days = int(timeframe.replace("d", ""))
+                interval_seconds = days * 24 * 3600
+            else:
+                # Default to 1h if unknown format
+                interval_seconds = 3600
+            
+            start_ts = now - int(required_bars * interval_seconds * buffer_factor)
+            
+            # Get crypto data
+            success, data = cd.get_data(symbol, start_ts=start_ts, end_ts=now, timeframe=timeframe, atr=True)
+            
+            if not success or data.empty:
+                error_msg = "Failed to get data or empty dataset"
+                print(f"{symbol} -> Error: {error_msg}")
+                return {"crypto": symbol, "status": "failed", "reason": error_msg}
+            
+            # Calculate RS score
+            success, rs_score, error = calculate_rs_score(data, required_bars)
+            if not success:
+                print(f"{symbol} -> Error: {error}")
+                return {"crypto": symbol, "status": "failed", "reason": error}
+            
+            print(f"{symbol} -> Successfully calculated RS Score: {rs_score}")
+            return {
+                "crypto": symbol,
+                "status": "success",
+                "rs_score": rs_score
+            }
+            
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Check if it's an API rate limit error
+            if "Too many requests" in error_msg or "1003" in error_msg:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"{symbol} -> Rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"{symbol} -> Rate limit exceeded, max retries reached")
+            else:
+                print(f"{symbol} -> Error: {error_msg}")
+            
             return {"crypto": symbol, "status": "failed", "reason": error_msg}
-        
-        # Calculate RS score
-        success, rs_score, error = calculate_rs_score(data, required_bars)
-        if not success:
-            print(f"{symbol} -> Error: {error}")
-            return {"crypto": symbol, "status": "failed", "reason": error}
-        
-        print(f"{symbol} -> Successfully calculated RS Score: {rs_score}")
-        return {
-            "crypto": symbol,
-            "status": "success",
-            "rs_score": rs_score
-        }
-        
-    except Exception as e:
-        error_msg = str(e)
-        print(f"{symbol} -> Error: {error_msg}")
-        return {"crypto": symbol, "status": "failed", "reason": error_msg}
 
 
 if __name__ == '__main__':

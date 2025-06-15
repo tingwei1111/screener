@@ -220,24 +220,52 @@ class StockDownloader:
 
     def get_all_tickers(self):
         """Get all stock symbols from both StockSymbol and Polygon"""
-        # Get symbols from StockSymbol
-        ss = StockSymbol(self.api_keys["stocksymbol"])
-        stock_symbol_list = [x for x in ss.get_symbol_list(market="US", symbols_only=True)
-                           if "." not in x]
+        all_symbols = []
+        
+        # Try to get symbols from StockSymbol
+        try:
+            ss = StockSymbol(self.api_keys["stocksymbol"])
+            stock_symbol_list = [x for x in ss.get_symbol_list(market="US", symbols_only=True)
+                               if "." not in x]
+            all_symbols.extend(stock_symbol_list)
+            print(f"Got {len(stock_symbol_list)} symbols from StockSymbol API")
+        except Exception as e:
+            print(f"StockSymbol API failed: {e}")
+            print("Using fallback stock list...")
+            # Fallback list of popular US stocks
+            fallback_stocks = [
+                "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "BRK.B", "UNH", "JNJ",
+                "V", "PG", "JPM", "HD", "CVX", "MA", "PFE", "ABBV", "BAC", "KO", "AVGO", "PEP",
+                "TMO", "COST", "DIS", "ABT", "ACN", "VZ", "ADBE", "WMT", "CRM", "NFLX", "DHR",
+                "NKE", "TXN", "BMY", "PM", "NEE", "RTX", "ORCL", "COP", "LIN", "QCOM", "T",
+                "UPS", "HON", "SBUX", "LOW", "AMD", "INTU", "IBM", "GS", "CAT", "DE", "SPGI",
+                "BLK", "AXP", "BKNG", "GILD", "MDT", "TJX", "AMT", "SYK", "ADP", "VRTX", "LRCX",
+                "CVS", "TMUS", "ZTS", "SCHW", "MU", "PLD", "CB", "MDLZ", "SO", "DUK", "BSX",
+                "BA", "ATVI", "ADI", "ISRG", "NOW", "WM", "GE", "MMM", "CCI", "TGT", "KLAC",
+                "SHW", "MO", "USB", "HUM", "REGN", "PYPL", "AON", "PANW", "FCX", "NSC", "ITW"
+            ]
+            all_symbols.extend(fallback_stocks)
 
-        # Get symbols from Polygon
-        polygon_stocks = self.client.list_tickers(
-            market="stocks",
-            # type="CS",
-            active=True,
-            limit=1000
-        )
-        polygon_common_stocks = [ticker.ticker for ticker in polygon_stocks]
+        # Try to get symbols from Polygon if API key is available
+        try:
+            if self.api_keys.get("polygon"):
+                polygon_stocks = self.client.list_tickers(
+                    market="stocks",
+                    active=True,
+                    limit=1000
+                )
+                polygon_common_stocks = [ticker.ticker for ticker in polygon_stocks]
+                all_symbols.extend(polygon_common_stocks)
+                print(f"Got {len(polygon_common_stocks)} symbols from Polygon API")
+            else:
+                print("Polygon API key not available, skipping Polygon data")
+        except Exception as e:
+            print(f"Polygon API failed: {e}")
 
-        # Merge and return unique symbols
-        all_symbols = sorted(set(stock_symbol_list).union(set(polygon_common_stocks)))
-        print(f"Found {len(all_symbols)} unique stock symbols")
-        return all_symbols
+        # Remove duplicates and sort
+        unique_symbols = sorted(set(all_symbols))
+        print(f"Found {len(unique_symbols)} unique stock symbols")
+        return unique_symbols
 
 
 class CryptoDownloader:
