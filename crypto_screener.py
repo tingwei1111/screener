@@ -4,11 +4,15 @@ import os
 import numpy as np
 from datetime import datetime
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
+from functools import lru_cache
+from typing import Dict, List, Tuple, Optional
 from src.downloader import CryptoDownloader
 
 
-def calc_total_bars(time_interval, days):
+@lru_cache(maxsize=32)
+def calc_total_bars(time_interval: str, days: int) -> Optional[int]:
+    """Calculate total bars for given time interval and days with caching"""
     bars_dict = {
         "5m": 12 * 24 * days,
         "15m": 4 * 24 * days,
@@ -17,16 +21,17 @@ def calc_total_bars(time_interval, days):
         "2h": 12 * days,
         "4h": 6 * days,
         "8h": 3 * days,
+        "1d": days,
     }
     return bars_dict.get(time_interval)
 
 
-def calculate_rs_score(crypto_data, required_bars):
+def calculate_rs_score(crypto_data: np.ndarray, required_bars: int) -> Tuple[bool, float, str]:
     """
-    Calculate RS score for cryptocurrency
+    Calculate RS score for cryptocurrency using optimized numpy operations
     
     Args:
-        crypto_data: DataFrame with cryptocurrency data
+        crypto_data: Pre-processed numpy array with [close, sma_30, sma_45, sma_60, atr]
         required_bars: Number of bars required for calculation
         
     Returns:
@@ -36,63 +41,45 @@ def calculate_rs_score(crypto_data, required_bars):
     if len(crypto_data) < required_bars:
         return False, 0, f"Insufficient data: {len(crypto_data)} < {required_bars}"
     
-    # Create a copy to avoid modifying the original data
-    data = crypto_data.copy()
-    
     # Take the most recent required_bars data points
-    data = data.tail(required_bars).reset_index(drop=True)
+    data = crypto_data[-required_bars:]
     
-    # Calculate RS Score
-    rs_score = 0.0
-    total_weight = 0.0
+    # Extract columns using vectorized operations
+    close_prices = data[:, 0]
+    sma_30 = data[:, 1]
+    sma_45 = data[:, 2]
+    sma_60 = data[:, 3]
+    atr_values = data[:, 4]
     
-    # Calculate for each data point
-    for i in range(required_bars):
-        # Current data point values
-        current_close = data['close'].iloc[i]
-        moving_average_30 = data['sma_30'].iloc[i]
-        moving_average_45 = data['sma_45'].iloc[i]
-        moving_average_60 = data['sma_60'].iloc[i]
-        current_atr = data['atr'].iloc[i]
-        
-        # Calculate relative strength numerator
-        numerator = ((current_close - moving_average_30) +
-                     (current_close - moving_average_45) +
-                     (current_close - moving_average_60) +
-                     (moving_average_30 - moving_average_45) +
-                     (moving_average_30 - moving_average_60) +
-                     (moving_average_45 - moving_average_60))
-        
-        # Use ATR as denominator with small epsilon to avoid division by zero
-        denominator = current_atr + 0.0000000000000000001
-        # denominator = (moving_average_30 + moving_average_45 + moving_average_60) / 3
-        
-        # Calculate relative strength for this point
-        relative_strength = numerator / denominator
-        
-        # Gives higher importance to newer data
-        # weight = i 
-        k = 2 * np.log(2) / required_bars   
-        weight = np.exp(k * i)              # Exponential weight where w(L/2) * 2 = w(L)
-        
-        
-        # Add to weighted sum
-        rs_score += relative_strength * weight
-        total_weight += weight
+    # Vectorized numerator calculation
+    numerator = ((close_prices - sma_30) +
+                 (close_prices - sma_45) +
+                 (close_prices - sma_60) +
+                 (sma_30 - sma_45) +
+                 (sma_30 - sma_60) +
+                 (sma_45 - sma_60))
     
-    # Normalize the final score by total weight
-    if total_weight > 0:
-        rs_score = rs_score / total_weight
-    else:
-        return False, 0, "Weight calculation error"
+    # Vectorized denominator with epsilon to avoid division by zero
+    denominator = atr_values + 1e-18
+    
+    # Vectorized relative strength calculation
+    relative_strength = numerator / denominator
+    
+    # Vectorized weight calculation (exponential decay)
+    k = 2 * np.log(2) / required_bars
+    indices = np.arange(required_bars)
+    weights = np.exp(k * indices)
+    
+    # Weighted average using numpy dot product
+    rs_score = np.dot(relative_strength, weights) / np.sum(weights)
 
     return True, rs_score, ""
 
 
-def process_crypto(symbol, timeframe, days):
-    """Process a single cryptocurrency and calculate its RS score"""
+def process_crypto(symbol: str, timeframe: str, days: int) -> Dict[str, any]:
+    """Process a single cryptocurrency and calculate its RS score with optimized data handling"""
     max_retries = 3
-    retry_delay = 2  # seconds
+    retry_delay = 1  # Reduced delay for faster processing
     
     for attempt in range(max_retries):
         try:
@@ -129,8 +116,18 @@ def process_crypto(symbol, timeframe, days):
                 print(f"{symbol} -> Error: {error_msg}")
                 return {"crypto": symbol, "status": "failed", "reason": error_msg}
             
+            # Pre-process data for vectorized calculation
+            required_columns = ['close', 'sma_30', 'sma_45', 'sma_60', 'atr']
+            if not all(col in data.columns for col in required_columns):
+                error_msg = f"Missing required columns: {required_columns}"
+                print(f"{symbol} -> Error: {error_msg}")
+                return {"crypto": symbol, "status": "failed", "reason": error_msg}
+            
+            # Convert to numpy array for faster processing
+            crypto_array = data[required_columns].to_numpy(dtype=np.float64)
+            
             # Calculate RS score
-            success, rs_score, error = calculate_rs_score(data, required_bars)
+            success, rs_score, error = calculate_rs_score(crypto_array, required_bars)
             if not success:
                 print(f"{symbol} -> Error: {error}")
                 return {"crypto": symbol, "status": "failed", "reason": error}
@@ -175,27 +172,41 @@ if __name__ == '__main__':
     all_cryptos = crypto_downloader.get_all_symbols()
     print(f"Total cryptos to process: {len(all_cryptos)}")
     
-    # Process all cryptos using ProcessPoolExecutor
-    num_cores = min(4, mp.cpu_count())  # Use maximum 4 cores, binance rest api has rate limit
-    print(f"Using {num_cores} processes")
-    with ProcessPoolExecutor(max_workers=num_cores) as executor:
-        futures = {executor.submit(process_crypto, crypto, timeframe, days): crypto for crypto in all_cryptos}
-        results = []
+    # Process all cryptos using ThreadPoolExecutor for I/O bound operations
+    num_workers = min(8, mp.cpu_count() * 2)  # Use more threads for I/O operations
+    print(f"Using {num_workers} workers")
+    
+    # Batch processing to reduce memory usage
+    batch_size = 50
+    all_results = []
+    
+    for i in range(0, len(all_cryptos), batch_size):
+        batch = all_cryptos[i:i + batch_size]
+        print(f"Processing batch {i//batch_size + 1}/{(len(all_cryptos) + batch_size - 1)//batch_size}")
         
-        for future in as_completed(futures):
-            crypto = futures[future]
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                print(f"{crypto} -> Error: {str(e)}")
-                results.append({"crypto": crypto, "status": "failed", "reason": str(e)})
+            futures = {executor.submit(process_crypto, crypto, timeframe, days): crypto for crypto in batch}
+            batch_results = []
+            
+            for future in as_completed(futures):
+                crypto = futures[future]
+                try:
+                    result = future.result()
+                    batch_results.append(result)
+                except Exception as e:
+                    print(f"{crypto} -> Error: {str(e)}")
+                    batch_results.append({"crypto": crypto, "status": "failed", "reason": str(e)})
+            
+            all_results.extend(batch_results)
+            
+            # Small delay between batches to respect API limits
+            if i + batch_size < len(all_cryptos):
+                time.sleep(2)
     
     # Process results
     failed_targets = []     # Failed to download data or error happened
     target_score = {}
     
-    for result in results:
+    for result in all_results:
         if result["status"] == "success":
             target_score[result["crypto"]] = result["rs_score"]
         else:

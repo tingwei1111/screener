@@ -1,9 +1,43 @@
-pytz
-pandas
-requests
-stocksymbol
-python-binance
-polygon-api-client
-dtaidistance
-matplotlib
-shapedtw
+# 核心依賴 - 必需
+numpy>=1.24.0
+pandas>=2.0.0
+requests>=2.31.0
+pytz>=2023.3
+
+# 數據源 - 必需
+python-binance>=1.0.19
+polygon-api-client>=1.13.0
+
+# 技術分析 - 核心功能
+dtaidistance>=2.3.0
+shapedtw>=0.1.0
+
+# 機器學習 - 核心
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+# 可選依賴
+# 股票數據（如需要股票分析）
+# stocksymbol>=0.1.0
+# yfinance>=0.2.0
+
+# 深度學習（如需要LSTM模型）
+# tensorflow>=2.13.0
+
+# 投資組合優化（如需要高級優化）
+# cvxpy>=1.4.0
+# scipy>=1.11.0
+
+# 可視化（如需要圖表）
+# matplotlib>=3.7.0
+
+# Web界面（如需要Web UI）
+# streamlit>=1.28.0
+# plotly>=5.17.0
+# dash>=2.14.0
+
+# 命令行工具
+tqdm>=4.66.0
+
+# 通知（移除非標準庫）
+# smtplib 是標準庫，不需要額外安裝

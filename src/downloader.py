@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from pytz import timezone
+from functools import lru_cache
+from typing import Dict, List, Tuple, Optional
 from stocksymbol import StockSymbol
 from polygon import RESTClient
 from urllib3.util.retry import Retry
@@ -19,33 +21,50 @@ CRYPTO_SMA = [30, 45, 60]
 ATR_PERIOD = 60  
 
 
-def calculate_atr(df, period=ATR_PERIOD):
+@lru_cache(maxsize=128)
+def calculate_atr_cached(high_tuple: tuple, low_tuple: tuple, close_tuple: tuple, period: int = ATR_PERIOD) -> np.ndarray:
     """
-    Calculate Average True Range (ATR) for the given dataframe
+    Calculate Average True Range (ATR) using optimized numpy operations with caching
     
     Args:
-        df: DataFrame containing 'high', 'low', 'close' columns
+        high_tuple, low_tuple, close_tuple: Price data as tuples for caching
         period: Period for ATR calculation (default: ATR_PERIOD)
         
     Returns:
-        Series containing ATR values
+        numpy array containing ATR values
     """
-    high = df['high']
-    low = df['low']
-    close = df['close']
+    high = np.array(high_tuple)
+    low = np.array(low_tuple)
+    close = np.array(close_tuple)
     
-    # Calculate True Range
+    # Calculate True Range using vectorized operations
     tr1 = high - low
-    tr2 = abs(high - close.shift())
-    tr3 = abs(low - close.shift())
+    tr2 = np.abs(high[1:] - close[:-1])
+    tr3 = np.abs(low[1:] - close[:-1])
     
-    # Get the maximum of the three price ranges
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    # Pad tr2 and tr3 to match tr1 length
+    tr2 = np.concatenate([[tr1[0]], tr2])
+    tr3 = np.concatenate([[tr1[0]], tr3])
     
-    # Calculate ATR as the simple moving average of True Range
-    atr = tr.rolling(window=period).mean()
+    # Stack and take maximum
+    tr_stack = np.stack([tr1, tr2, tr3])
+    tr = np.max(tr_stack, axis=0)
+    
+    # Calculate ATR using pandas for rolling mean (more efficient for this operation)
+    atr = pd.Series(tr).rolling(window=period, min_periods=1).mean().values
     
     return atr
+
+def calculate_atr(df: pd.DataFrame, period: int = ATR_PERIOD) -> pd.Series:
+    """
+    Calculate Average True Range (ATR) for the given dataframe
+    """
+    high_tuple = tuple(df['high'].values)
+    low_tuple = tuple(df['low'].values)
+    close_tuple = tuple(df['close'].values)
+    
+    atr_values = calculate_atr_cached(high_tuple, low_tuple, close_tuple, period)
+    return pd.Series(atr_values, index=df.index)
 
 
 def parse_time_string(time_string):

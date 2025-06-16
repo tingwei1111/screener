@@ -1,0 +1,24 @@
+{
+  "alert_conditions": [
+    {
+      "symbol": "BTCUSDT",
+      "condition_type": "rs_score",
+      "threshold": 8.0,
+      "timeframe": "15m",
+      "enabled": true,
+      "cooldown_minutes": 60,
+      "last_triggered": null
+    }
+  ],
+  "notification_config": {
+    "email_enabled": false,
+    "email_smtp_server": "smtp.gmail.com",
+    "email_smtp_port": 587,
+    "email_username": "",
+    "email_password": "",
+    "email_recipients": [],
+    "webhook_enabled": false,
+    "webhook_url": "",
+    "desktop_enabled": true
+  }
+}
