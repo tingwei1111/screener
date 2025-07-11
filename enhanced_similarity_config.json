@@ -1,0 +1,176 @@
+{
+  "analysis_config": {
+    "dtw_parameters": {
+      "window_ratio": 0.15,
+      "step_pattern": "symmetric2",
+      "distance_only": false,
+      "max_warping_path_length": 1000
+    },
+    "similarity_thresholds": {
+      "high": 0.8,
+      "medium": 0.6,
+      "low": 0.4,
+      "very_low": 0.2
+    },
+    "multidimensional_weights": {
+      "price": 0.4,
+      "volume": 0.2,
+      "volatility": 0.2,
+      "price_volume_relationship": 0.2
+    },
+    "normalization": {
+      "method": "z_score",
+      "alternative_methods": ["min_max", "robust"]
+    },
+    "volatility_calculation": {
+      "window": 20,
+      "method": "rolling_std"
+    }
+  },
+  "data_config": {
+    "default_timeframe": "1h",
+    "default_analysis_days": 7,
+    "default_pattern_days": 7,
+    "min_data_points": 10,
+    "supported_timeframes": ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"],
+    "required_columns": ["Open", "High", "Low", "Close"],
+    "optional_columns": ["Volume"]
+  },
+  "reference_patterns": {
+    "builtin_patterns": [
+      {
+        "name": "BTC_Bull_Run_Pattern",
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "days": 7,
+        "description": "BTC 牛市突破模式",
+        "category": "bullish_breakout"
+      },
+      {
+        "name": "ETH_Momentum_Pattern",
+        "symbol": "ETHUSDT",
+        "timeframe": "1h",
+        "days": 7,
+        "description": "ETH 動量上升模式",
+        "category": "momentum_up"
+      },
+      {
+        "name": "SOL_Recovery_Pattern",
+        "symbol": "SOLUSDT",
+        "timeframe": "1h",
+        "days": 7,
+        "description": "SOL 復甦反彈模式",
+        "category": "recovery_bounce"
+      },
+      {
+        "name": "ADA_Consolidation_Pattern",
+        "symbol": "ADAUSDT",
+        "timeframe": "1h",
+        "days": 7,
+        "description": "ADA 盤整突破模式",
+        "category": "consolidation_breakout"
+      },
+      {
+        "name": "DOT_Trend_Pattern",
+        "symbol": "DOTUSDT",
+        "timeframe": "1h",
+        "days": 7,
+        "description": "DOT 趨勢延續模式",
+        "category": "trend_continuation"
+      }
+    ],
+    "pattern_categories": {
+      "bullish_breakout": {
+        "description": "牛市突破模式",
+        "characteristics": ["強勢上漲", "成交量放大", "突破阻力"]
+      },
+      "momentum_up": {
+        "description": "上升動量模式",
+        "characteristics": ["持續上漲", "動量增強", "趨勢確立"]
+      },
+      "recovery_bounce": {
+        "description": "復甦反彈模式",
+        "characteristics": ["底部反彈", "成交量回升", "技術修復"]
+      },
+      "consolidation_breakout": {
+        "description": "盤整突破模式",
+        "characteristics": ["橫盤整理", "量能積累", "方向選擇"]
+      },
+      "trend_continuation": {
+        "description": "趨勢延續模式",
+        "characteristics": ["趨勢持續", "回調有限", "強勢維持"]
+      }
+    }
+  },
+  "output_config": {
+    "default_output_dir": "enhanced_similarity_output",
+    "create_visualizations": true,
+    "save_detailed_reports": true,
+    "report_formats": ["txt", "csv", "json"],
+    "visualization_config": {
+      "figure_size": [20, 16],
+      "dpi": 300,
+      "color_scheme": {
+        "high_similarity": "green",
+        "medium_similarity": "orange",
+        "low_similarity": "red",
+        "very_low_similarity": "gray"
+      },
+      "chart_types": {
+        "similarity_ranking": true,
+        "multidimensional_radar": true,
+        "similarity_distribution": true,
+        "dimension_comparison": true
+      }
+    }
+  },
+  "performance_config": {
+    "max_concurrent_analyses": 5,
+    "api_rate_limit": {
+      "requests_per_minute": 1200,
+      "sleep_between_requests": 0.1
+    },
+    "memory_optimization": {
+      "clear_cache_after_analysis": true,
+      "max_cache_size_mb": 500
+    }
+  },
+  "advanced_features": {
+    "price_volume_relationship": {
+      "enabled": true,
+      "calculation_method": "correlation",
+      "window_size": 20
+    },
+    "volatility_clustering": {
+      "enabled": true,
+      "garch_modeling": false
+    },
+    "seasonal_adjustments": {
+      "enabled": false,
+      "time_of_day_effects": false,
+      "day_of_week_effects": false
+    },
+    "machine_learning_enhancement": {
+      "enabled": false,
+      "feature_engineering": false,
+      "ensemble_methods": false
+    }
+  },
+  "logging_config": {
+    "log_level": "INFO",
+    "log_to_file": true,
+    "log_file_path": "enhanced_similarity_analysis.log",
+    "log_format": "%(asctime)s - %(levelname)s - %(message)s"
+  },
+  "validation_config": {
+    "data_quality_checks": {
+      "check_missing_values": true,
+      "check_outliers": true,
+      "check_data_consistency": true
+    },
+    "similarity_validation": {
+      "cross_validation": false,
+      "bootstrap_confidence_intervals": false
+    }
+  }
+} 

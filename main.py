@@ -21,10 +21,7 @@ def main():
   python main.py crypto --top 20                    # 加密貨幣篩選
   python main.py trend --symbol BTCUSDT             # 趨勢分析
   python main.py ml --train BTCUSDT                 # 機器學習訓練
-  python main.py portfolio --symbols BTC ETH ADA    # 投資組合優化
-  python main.py monitor --add BTCUSDT rs_score 8.0 # 實時監控
-  python main.py trade --start                      # 自動交易
-  python main.py web                                # Web儀表板
+  python main.py ml --symbol BTC                    # 機器學習預測
 
 更多幫助: python main.py <command> --help
         """
@@ -53,36 +50,7 @@ def main():
     ml_parser.add_argument('--timeframe', default='1h', help='時間框架')
     ml_parser.add_argument('--days', type=int, default=365, help='訓練天數')
     
-    # 4. 投資組合優化
-    portfolio_parser = subparsers.add_parser('portfolio', help='投資組合優化')
-    portfolio_parser.add_argument('--symbols', nargs='+', required=True, help='資產符號列表')
-    portfolio_parser.add_argument('--method', default='max_sharpe', 
-                                choices=['max_sharpe', 'min_vol', 'risk_parity', 'equal_weight'],
-                                help='優化方法')
-    portfolio_parser.add_argument('--days', type=int, default=252, help='歷史數據天數')
-    portfolio_parser.add_argument('--monte-carlo', action='store_true', help='執行蒙特卡羅模擬')
-    portfolio_parser.add_argument('--plot', action='store_true', help='繪製圖表')
-    
-    # 5. 實時監控
-    monitor_parser = subparsers.add_parser('monitor', help='實時監控')
-    monitor_parser.add_argument('--add', nargs=3, metavar=('SYMBOL', 'TYPE', 'THRESHOLD'),
-                               help='添加警報: 符號 類型 閾值')
-    monitor_parser.add_argument('--list', action='store_true', help='列出所有警報')
-    monitor_parser.add_argument('--start', action='store_true', help='開始監控')
-    monitor_parser.add_argument('--stop', action='store_true', help='停止監控')
-    
-    # 6. 自動交易
-    trade_parser = subparsers.add_parser('trade', help='自動交易')
-    trade_parser.add_argument('--start', action='store_true', help='開始交易')
-    trade_parser.add_argument('--stop', action='store_true', help='停止交易')
-    trade_parser.add_argument('--status', action='store_true', help='查看狀態')
-    trade_parser.add_argument('--test', nargs=3, metavar=('SYMBOL', 'SIGNAL', 'CONFIDENCE'),
-                             help='測試信號: 符號 信號 信心度')
-    
-    # 7. Web儀表板
-    web_parser = subparsers.add_parser('web', help='Web儀表板')
-    web_parser.add_argument('--port', type=int, default=8501, help='端口號 (默認: 8501)')
-    web_parser.add_argument('--host', default='localhost', help='主機地址')
+
     
     args = parser.parse_args()
     
@@ -97,14 +65,6 @@ def main():
             run_trend_analysis(args)
         elif args.command == 'ml':
             run_ml_predictor(args)
-        elif args.command == 'portfolio':
-            run_portfolio_optimizer(args)
-        elif args.command == 'monitor':
-            run_monitor(args)
-        elif args.command == 'trade':
-            run_trader(args)
-        elif args.command == 'web':
-            run_web_dashboard(args)
     except KeyboardInterrupt:
         print("\n程序被用戶中斷")
     except Exception as e:
@@ -162,65 +122,9 @@ def run_ml_predictor(args):
     cmd.extend(['--timeframe', args.timeframe, '--days', str(args.days)])
     subprocess.run(cmd)
 
-def run_portfolio_optimizer(args):
-    """運行投資組合優化器"""
-    import subprocess
-    cmd = [
-        'python', 'portfolio_optimizer.py',
-        '--symbols'
-    ] + args.symbols + [
-        '--method', args.method,
-        '--days', str(args.days)
-    ]
-    
-    if args.monte_carlo:
-        cmd.append('--monte-carlo')
-    if args.plot:
-        cmd.append('--plot')
-    
-    subprocess.run(cmd)
 
-def run_monitor(args):
-    """運行實時監控"""
-    import subprocess
-    cmd = ['python', 'real_time_monitor.py']
-    
-    if args.add:
-        cmd.extend(['--add-alert'] + args.add)
-    elif args.list:
-        cmd.append('--list-alerts')
-    elif args.start:
-        cmd.append('--start')
-    elif args.stop:
-        cmd.append('--stop')
-    
-    subprocess.run(cmd)
 
-def run_trader(args):
-    """運行自動交易器"""
-    import subprocess
-    cmd = ['python', 'auto_trader.py']
-    
-    if args.start:
-        cmd.append('--start')
-    elif args.stop:
-        cmd.append('--stop')
-    elif args.status:
-        cmd.append('--status')
-    elif args.test:
-        cmd.extend(['--test-signal'] + args.test)
-    
-    subprocess.run(cmd)
 
-def run_web_dashboard(args):
-    """運行Web儀表板"""
-    import subprocess
-    cmd = [
-        'streamlit', 'run', 'web_dashboard.py',
-        '--server.port', str(args.port),
-        '--server.address', args.host
-    ]
-    subprocess.run(cmd)
 
 if __name__ == '__main__':
     main() 
